@@ -84,5 +84,30 @@ class PointControllerTest {
                 .andExpect(jsonPath("$.point").value(initialUserPoint.point() + chargePoint));
     }
 
+    // 유저의 포인트 사용 후 포인터가 잘 감소 되는지 확인하기 위함
+    @Test
+    @DisplayName("특정 유저의 포인트를 사용한다")
+    void use() throws Exception {
+        // given
+        long id = 1L;
+        long initialPoint = 1000L;
+        long usePoint = 400L;
 
+        PointRequest request = PointRequest.builder()
+                .id(id)
+                .point(usePoint)
+                .build();
+
+        UserPoint useUserPoint = new UserPoint(id, initialPoint - usePoint, System.currentTimeMillis());
+        when(pointService.usePoint(any(PointServiceRequest.class))).thenReturn(PointResponse.of(useUserPoint));
+
+        // when then
+        mockMvc.perform(patch("/point/{id}/use", id)
+                        .content(objectMapper.writeValueAsString(request))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andDo(print())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.point").value(initialPoint - usePoint));
+    }
 }

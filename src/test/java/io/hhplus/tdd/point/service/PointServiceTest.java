@@ -93,4 +93,56 @@ class PointServiceTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("0 이하의 포인트를 충전할 수 없습니다");
     }
+
+    // 포인트 사용 시 정상 차감 되는지 확인하기 위함
+    @Test
+    @DisplayName("포인트 사용 시 이전 포인트에서 사용 금액만큼 포인트가 차감된다")
+    void usePoint() {
+        // given
+        long id = 1L;
+        long initialPoint = 400L;
+        long usePoint = 399L;
+
+        PointServiceRequest request = PointServiceRequest.builder()
+                .id(id)
+                .point(usePoint)
+                .build();
+
+        UserPoint userPoint = new UserPoint(id, initialPoint, System.currentTimeMillis());
+        UserPoint usedUserPoint = new UserPoint(id, initialPoint - usePoint, System.currentTimeMillis());
+
+        // when
+        when(pointTable.selectById(id)).thenReturn(userPoint);
+        when(pointTable.insertOrUpdate(anyLong(),anyLong())).thenReturn(usedUserPoint);
+
+        PointResponse response = pointService.usePoint(request);
+
+        // then
+        assertThat(response.getId()).isEqualTo(id);
+        assertThat(response.getPoint()).isEqualTo(userPoint.point() - usePoint);
+    }
+
+    // 포인트 잔고가 없는 경우를 검증
+    @Test
+    @DisplayName("현재 포인트보다 사용하려는 포인트가 더 많으면 에러 발생")
+    void usePoint_fail_not_enough_point() {
+        // given
+        long id = 1L;
+        long initialPoint = 400L;
+        long usePoint = 401L;
+
+        PointServiceRequest request = PointServiceRequest.builder()
+                .id(id)
+                .point(usePoint)
+                .build();
+
+        UserPoint userPoint = new UserPoint(id, initialPoint, System.currentTimeMillis());
+
+        when(pointTable.selectById(id)).thenReturn(userPoint);
+
+        // when then
+        assertThatThrownBy(() -> pointService.usePoint(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("포인트 잔고가 부족합니다.");
+    }
 }

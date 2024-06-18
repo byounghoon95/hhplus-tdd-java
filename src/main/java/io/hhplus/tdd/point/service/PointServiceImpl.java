@@ -35,4 +35,19 @@ public class PointServiceImpl implements PointService{
 
         return PointResponse.of(pointTable.insertOrUpdate(chargedUserPoint.id(),chargedUserPoint.point()));
     }
+
+    @Override
+    public PointResponse usePoint(PointServiceRequest request) {
+
+        UserPoint userPoint = pointTable.selectById(request.getId());
+
+        if (userPoint.point() - request.getPoint() < 0) {
+            throw new IllegalArgumentException("포인트 잔고가 부족합니다.");
+        }
+
+        UserPoint usedUserPoint = UserPoint.usePoints(userPoint, request.getPoint());
+        historyTable.insert(userPoint.id(), request.getPoint(), TransactionType.USE, System.currentTimeMillis());
+
+        return PointResponse.of(pointTable.insertOrUpdate(usedUserPoint.id(),usedUserPoint.point()));
+    }
 }
