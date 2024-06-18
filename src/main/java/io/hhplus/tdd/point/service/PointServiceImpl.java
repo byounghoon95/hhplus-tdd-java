@@ -4,10 +4,14 @@ import io.hhplus.tdd.database.PointHistoryTable;
 import io.hhplus.tdd.database.UserPointTable;
 import io.hhplus.tdd.point.TransactionType;
 import io.hhplus.tdd.point.UserPoint;
+import io.hhplus.tdd.point.service.domain.PointHistoryResponse;
 import io.hhplus.tdd.point.service.domain.PointResponse;
 import io.hhplus.tdd.point.service.domain.PointServiceRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Service
@@ -19,6 +23,13 @@ public class PointServiceImpl implements PointService{
     @Override
     public PointResponse selectPoint(long id) {
         return PointResponse.of(pointTable.selectById(id));
+    }
+
+    @Override
+    public List<PointHistoryResponse> selectPointHistories(long id) {
+        return historyTable.selectAllByUserId(id).stream()
+                .map(pointHistory -> new PointHistoryResponse(pointHistory.id(), pointHistory.userId(), pointHistory.amount(),pointHistory.type(),pointHistory.updateMillis()))
+                .collect(Collectors.toList());
     }
 
     @Override

@@ -2,7 +2,10 @@ package io.hhplus.tdd.point.service;
 
 import io.hhplus.tdd.database.PointHistoryTable;
 import io.hhplus.tdd.database.UserPointTable;
+import io.hhplus.tdd.point.PointHistory;
+import io.hhplus.tdd.point.TransactionType;
 import io.hhplus.tdd.point.UserPoint;
+import io.hhplus.tdd.point.service.domain.PointHistoryResponse;
 import io.hhplus.tdd.point.service.domain.PointResponse;
 import io.hhplus.tdd.point.service.domain.PointServiceRequest;
 import org.junit.jupiter.api.DisplayName;
@@ -12,8 +15,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 
@@ -45,6 +49,34 @@ class PointServiceTest {
         // then
         assertThat(response.getId()).isEqualTo(id);
         assertThat(response.getPoint()).isEqualTo(userPoint.point());
+    }
+
+    // 포인트 조회가 정상적으로 되는지 확인
+    @Test
+    @DisplayName("유저 아이디로 포인트를 조회한다")
+    void selectPointHistories() {
+        // given
+        long id = 1L;
+
+        PointHistory history1 = new PointHistory(1L, 1L, 500L, TransactionType.CHARGE, System.currentTimeMillis());
+        PointHistory history2 = new PointHistory(2L, 1L, 1000L, TransactionType.CHARGE, System.currentTimeMillis());
+        PointHistory history3 = new PointHistory(3L, 1L, 300L, TransactionType.USE, System.currentTimeMillis());
+
+        List<PointHistory> historyList = List.of(history1, history2, history3);
+
+        // when
+        when(historyTable.selectAllByUserId(id)).thenReturn(historyList);
+        List<PointHistoryResponse> response = pointService.selectPointHistories(id);
+
+        // then
+        assertThat(response).hasSize(3)
+                .extracting("userId", "point", "type")
+                .containsExactlyInAnyOrder(
+                        tuple(1L, 500L, TransactionType.CHARGE),
+                        tuple(1L, 1000L, TransactionType.CHARGE),
+                        tuple(1L, 300L, TransactionType.USE)
+                );
+        assertThat(response.get(0)).isInstanceOf(PointHistoryResponse.class);
     }
 
     // 포인트 충전 시 충전이 정상 처리 되는지 확인하기 위함

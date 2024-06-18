@@ -1,9 +1,11 @@
 package io.hhplus.tdd.point.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.hhplus.tdd.point.TransactionType;
 import io.hhplus.tdd.point.UserPoint;
 import io.hhplus.tdd.point.controller.dto.PointRequest;
 import io.hhplus.tdd.point.service.PointServiceImpl;
+import io.hhplus.tdd.point.service.domain.PointHistoryResponse;
 import io.hhplus.tdd.point.service.domain.PointResponse;
 import io.hhplus.tdd.point.service.domain.PointServiceRequest;
 import org.junit.jupiter.api.DisplayName;
@@ -13,6 +15,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -53,6 +57,35 @@ class PointControllerTest {
                 .andDo(print())
                 .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.point").value(amount));
+    }
+
+    // 유저의 포인트 히스토리를 조회하는 기능
+    @Test
+    @DisplayName("특정 유저의 포인트 히스토리를 조회한다")
+    void history() throws Exception {
+        // given
+        long id = 1L;
+
+        PointHistoryResponse history1 = new PointHistoryResponse(1L, 1L, 500L, TransactionType.CHARGE, System.currentTimeMillis());
+        PointHistoryResponse history2 = new PointHistoryResponse(2L, 1L, 1000L, TransactionType.CHARGE, System.currentTimeMillis());
+        PointHistoryResponse history3 = new PointHistoryResponse(3L, 1L, 300L, TransactionType.USE, System.currentTimeMillis());
+
+        List<PointHistoryResponse> historyList = List.of(history1, history2, history3);
+
+        // when
+        when(pointService.selectPointHistories(id)).thenReturn(historyList);
+
+        // then
+        mockMvc.perform(get("/point/{id}/histories", id))
+                .andExpect(status().isOk())
+                .andDo(print())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].userId").value(1L))
+                .andExpect(jsonPath("$[0].point").value(500L))
+                .andExpect(jsonPath("$[0].type").value("CHARGE"))
+                .andExpect(jsonPath("$[2].userId").value(1L))
+                .andExpect(jsonPath("$[2].point").value(300L))
+                .andExpect(jsonPath("$[2].type").value("USE"));
     }
 
     // 유저의 포인트 충전 시 충전된 값을 반환하는지 확인하기 위한 테스트
