@@ -16,6 +16,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -126,6 +130,53 @@ class PointServiceTest {
                 .hasMessage("0 이하의 포인트를 충전할 수 없습니다");
     }
 
+    // 포인트 충전 로직 동시성 처리를 검증
+    @Test
+    @DisplayName("여러 쓰레드에서 충전 요청이 들어올 때 충전 로직을 검증한다")
+    void chargePoint_concurrent_10_request() throws InterruptedException {
+        // given
+        long id = 1L;
+        long initialPoint = 500L;
+        long chargePoint = 1000L;
+
+        PointServiceRequest request = PointServiceRequest.builder()
+                .id(id)
+                .point(chargePoint)
+                .build();
+
+        // when
+        AtomicReference<UserPoint> userPoint = new AtomicReference<>(new UserPoint(id, initialPoint, System.currentTimeMillis()));
+
+        when(pointTable.selectById(id)).thenAnswer(invocation -> userPoint.get());
+        when(pointTable.insertOrUpdate(anyLong(), anyLong())).thenAnswer(invocation -> {
+            long updatedId = invocation.getArgument(0);
+            long updatedPoint = invocation.getArgument(1);
+            UserPoint updatedUserPoint = new UserPoint(updatedId, updatedPoint, System.currentTimeMillis());
+            userPoint.set(updatedUserPoint);
+            return updatedUserPoint;
+        });
+
+        int threadCount = 10;
+        ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch (threadCount);
+
+        for (int i = 0; i < 10; i++) {
+            executorService.execute(() -> {
+                pointService.chargePoint(request);
+                latch.countDown();
+            });
+        }
+
+        latch.await();
+        executorService.shutdown();
+
+        UserPoint finalUserPoint = pointTable.selectById(id);
+
+        // then
+        assertThat(finalUserPoint.id()).isEqualTo(id);
+        assertThat(finalUserPoint.point()).isEqualTo(initialPoint + (chargePoint * threadCount));
+    }
+
     // 포인트 사용 시 정상 차감 되는지 확인하기 위함
     @Test
     @DisplayName("포인트 사용 시 이전 포인트에서 사용 금액만큼 포인트가 차감된다")
@@ -176,5 +227,52 @@ class PointServiceTest {
         assertThatThrownBy(() -> pointService.usePoint(request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("포인트 잔고가 부족합니다.");
+    }
+
+    // 포인트 사용 로직 동시성 처리를 검증
+    @Test
+    @DisplayName("여러 쓰레드에서 사용 요청이 들어올 때 사용 로직을 검증한다")
+    void usePoint_concurrent_10_request() throws InterruptedException {
+        // given
+        long id = 1L;
+        long initialPoint = 10000L;
+        long usePoint = 500L;
+
+        PointServiceRequest request = PointServiceRequest.builder()
+                .id(id)
+                .point(usePoint)
+                .build();
+
+        // when
+        AtomicReference<UserPoint> userPoint = new AtomicReference<>(new UserPoint(id, initialPoint, System.currentTimeMillis()));
+
+        when(pointTable.selectById(id)).thenAnswer(invocation -> userPoint.get());
+        when(pointTable.insertOrUpdate(anyLong(), anyLong())).thenAnswer(invocation -> {
+            long updatedId = invocation.getArgument(0);
+            long updatedPoint = invocation.getArgument(1);
+            UserPoint updatedUserPoint = new UserPoint(updatedId, updatedPoint, System.currentTimeMillis());
+            userPoint.set(updatedUserPoint);
+            return updatedUserPoint;
+        });
+
+        int threadCount = 10;
+        ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch (threadCount);
+
+        for (int i = 0; i < 10; i++) {
+            executorService.execute(() -> {
+                pointService.usePoint(request);
+                latch.countDown();
+            });
+        }
+
+        latch.await();
+        executorService.shutdown();
+
+        UserPoint finalUserPoint = pointTable.selectById(id);
+
+        // then
+        assertThat(finalUserPoint.id()).isEqualTo(id);
+        assertThat(finalUserPoint.point()).isEqualTo(initialPoint - (usePoint * threadCount));
     }
 }

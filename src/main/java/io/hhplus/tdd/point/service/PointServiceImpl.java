@@ -33,7 +33,7 @@ public class PointServiceImpl implements PointService{
     }
 
     @Override
-    public PointResponse chargePoint(PointServiceRequest request) {
+    public synchronized PointResponse chargePoint(PointServiceRequest request) {
 
         if (request.getPoint() <= 0) {
             throw new IllegalArgumentException("0 이하의 포인트를 충전할 수 없습니다");
@@ -48,7 +48,7 @@ public class PointServiceImpl implements PointService{
     }
 
     @Override
-    public PointResponse usePoint(PointServiceRequest request) {
+    public synchronized PointResponse usePoint(PointServiceRequest request) {
 
         UserPoint userPoint = pointTable.selectById(request.getId());
 
